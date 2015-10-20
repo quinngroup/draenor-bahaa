@@ -31,10 +31,9 @@ object DRAENOR {
 			.map(line => Vectors.dense(line.split(",").map(_.toDouble)))
 				.zipWithIndex.map(_.swap)
 			
-
 		//val indices = vertices.map(_._1)
 		
-		def rbf(c:Double)(v1:Vector, v2:Vector): Double = Math.exp(-c*Vectors.sqdist(v1,v2)) //dissimilarity, I know
+		def rbf(c:Double)(v1:Vector, v2:Vector): Double = Math.exp(-c*Vectors.sqdist(v1,v2)) 
 		val kernel = rbf(0.01)_
 		val edges = vertices.cartesian(vertices).filter({case ((l1,v1),(l2,v2)) => l1!=l2}).map({case ((l1,v1),(l2,v2)) => Edge(l1,l2,kernel(v1,v2))}) 
 		

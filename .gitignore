@@ -1,0 +1,4 @@
+data/*
+!data/inputData.csv
+target/*
+project/*

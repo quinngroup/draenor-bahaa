@@ -29,16 +29,22 @@ object DRAENOR {
 		//val lines = textFileWithLineNums(sc,"data/inputData.csv")
 		val vertices= sc.textFile("data/inputData.csv")
 			.map(line => Vectors.dense(line.split(",").map(_.toDouble)))
-				.zipWithIndex.map(_.swap)
+				.zipWithIndex.map(_.swap) // for tie breaking and preserving lexographical ordering
 			
 		//val indices = vertices.map(_._1)
 		
 		def rbf(c:Double)(v1:Vector, v2:Vector): Double = Math.exp(-c*Vectors.sqdist(v1,v2)) 
 		val kernel = rbf(0.01)_
-		val edges = vertices.cartesian(vertices).filter({case ((l1,v1),(l2,v2)) => l1!=l2}).map({case ((l1,v1),(l2,v2)) => Edge(l1,l2,kernel(v1,v2))}) 
+		val edges = vertices.cartesian(vertices)
+				.filter({case ((l1,v1),(l2,v2)) => l1 <= l2}) //construct an edge only between vertices where label1 < label2
+				// so that only half the the symmetric matrix is represented
+				.map({case ((l1,v1),(l2,v2)) => Edge(l1,l2,kernel(v1,v2))})  // the weight of the edge is the kernel
 		
 		val graph = Graph(vertices, edges) 
+
 		
+		//triangles
+		//graph.aggregateMessages
 		edges.collect()
 
 

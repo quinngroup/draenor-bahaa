@@ -26,7 +26,7 @@ object DRAENOR {
 		val kernel = inverseQuadratic(5)_ //rbf(5)_
 		val edges = vertices.cartesian(vertices)
 				.filter({case ((l1,v1),(l2,v2)) => l1 <= l2}) //construct an edge only between vertices where label1 < label2
-				// so that only half the the symmetric matrix is represented
+				// so that only half the the symmetric matrix is represented ( n(n+1)/2 edges , where n is number of datapoints)
 				.map({case ((l1,v1),(l2,v2)) => Edge(l1,l2, kernel(v1,v2))})  // the weight of the edge is the kernel
 		
 		val graph = Graph(vertices, edges) 

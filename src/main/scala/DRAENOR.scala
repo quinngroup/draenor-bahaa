@@ -10,6 +10,7 @@ import org.apache.spark.rdd._
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.linalg.DenseVector
+import breeze.linalg.{DenseVector => BDV}
 
 object DRAENOR {
 	def main(args: Array[String]){
@@ -22,10 +23,11 @@ object DRAENOR {
 			
 		
 		def rbf(sigma:Double)(v1:Vector, v2:Vector): Double = Math.exp(-Vectors.sqdist(v1,v2)/(2*sigma*sigma)) 
-		def inverseQuadratic(epsilon:Double) (v1:Vector,v2:Vector):Double = 1 / (1 + (epsilon*Vectors.sqdist(v1,v2)))
-		val kernel = inverseQuadratic(5)_ //rbf(5)_
+		def inverseQuadratic(epsilon:Double) (v1:Vector,v2:Vector):Double = 1 / (1 + math.pow(epsilon*Vectors.sqdist(v1,v2),2))
+		def dotProduct(v1:Vector, v2:Vector):Double = BDV(v1.toArray) dot BDV(v2.toArray)
+		val kernel =  rbf(5.0)_ //inverseQuadratic(5.0)_
 		val edges = vertices.cartesian(vertices)
-				.filter({case ((l1,v1),(l2,v2)) => l1 <= l2}) //construct an edge only between vertices where label1 < label2
+				.filter({case ((l1,v1),(l2,v2)) => l1 <= l2}) //construct an edge only between vertices where label1 <= label2
 				// so that only half the the symmetric matrix is represented ( n(n+1)/2 edges , where n is number of datapoints)
 				.map({case ((l1,v1),(l2,v2)) => Edge(l1,l2, kernel(v1,v2))})  // the weight of the edge is the kernel
 		
@@ -49,9 +51,6 @@ object DRAENOR {
 
 		q.saveAsTextFile(outputPath)
 
-		//edges.collect()
-
-		//graph.degree
 
 
 	}

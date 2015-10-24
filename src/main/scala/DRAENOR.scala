@@ -12,41 +12,46 @@ import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.linalg.DenseVector
 
 object DRAENOR {
-/*		def myWithScope[U] (sc:SparkContext) (body: => U): U = RDDOperationScope.withScope(sc)(body)
-		def assertNotStopped(sc:SparkContext) {
-			if(sc.stopped.get()) throw new IllegalStateException("Cannot call methods on a stopped SparkContext")
-		}
-		def textFileWithLineNums(sc: SparkContext, path: String): RDD[(Long,String)] =  {
-   			 assertNotStopped(sc)
-    			sc.hadoopFile(path, classOf[TextInputFormat], classOf[LongWritable], classOf[Text], sc.defaultMinPartitions)
-			.map(pair => (pair._1.get,pair._2.toString))
-			///            ^^^^^ need this for lexographical order of verticies
-		}
-
-*/
 	def main(args: Array[String]){
 		val sc = new SparkContext()
-		//val lines = textFileWithLineNums(sc,"data/inputData.csv")
-		val vertices= sc.textFile("data/inputData.csv")
+		val inputPath = args(0)
+		val outputPath = args(1)
+		val vertices= sc.textFile(inputPath)
 			.map(line => Vectors.dense(line.split(",").map(_.toDouble)))
 				.zipWithIndex.map(_.swap) // for tie breaking and preserving lexographical ordering
 			
-		//val indices = vertices.map(_._1)
 		
-		def rbf(c:Double)(v1:Vector, v2:Vector): Double = Math.exp(-c*Vectors.sqdist(v1,v2)) 
-		val kernel = rbf(0.01)_
+		def rbf(sigma:Double)(v1:Vector, v2:Vector): Double = Math.exp(-Vectors.sqdist(v1,v2)/(2*sigma*sigma)) 
+		def inverseQuadratic(epsilon:Double) (v1:Vector,v2:Vector):Double = 1 / (1 + (epsilon*Vectors.sqdist(v1,v2)))
+		val kernel = inverseQuadratic(5)_ //rbf(5)_
 		val edges = vertices.cartesian(vertices)
 				.filter({case ((l1,v1),(l2,v2)) => l1 <= l2}) //construct an edge only between vertices where label1 < label2
 				// so that only half the the symmetric matrix is represented
-				.map({case ((l1,v1),(l2,v2)) => Edge(l1,l2,kernel(v1,v2))})  // the weight of the edge is the kernel
+				.map({case ((l1,v1),(l2,v2)) => Edge(l1,l2, kernel(v1,v2))})  // the weight of the edge is the kernel
 		
 		val graph = Graph(vertices, edges) 
-
 		
-		//triangles
-		//graph.aggregateMessages
-		edges.collect()
+		
+		//computing degree
+		val degreeGraph = Graph[Double,Double](graph.aggregateMessages( edgeContext =>{
+									edgeContext.sendToSrc(edgeContext.attr)
+									if ( edgeContext.srcId != edgeContext.dstId ) // send only once for self-connected vertex
+										edgeContext.sendToDst(edgeContext.attr)
+									}, _+_ ) , graph.edges)
+		//computing normalized Laplacian I - D^0.5 A D^0.5	
+		val normalizedLaplacianGraph:Graph[Double, Double] = degreeGraph.mapTriplets( ctx => {
+											if (ctx.srcId != ctx.dstId)
+												- ctx.attr / Math.sqrt(ctx.srcAttr*ctx.dstAttr) // off diagonal
+											else
+												1 - ctx.attr/ctx.srcAttr   // diagonal
+											})
+		val q= normalizedLaplacianGraph.triplets.map(t => (t.srcId,t.dstId,t.attr))
 
+		q.saveAsTextFile(outputPath)
+
+		//edges.collect()
+
+		//graph.degree
 
 
 	}
